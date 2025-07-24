@@ -7,82 +7,24 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useEffect, useMemo, useState } from "react";
-// Hello this is comment
+
+const COLORS = [
+  "#3B82F6", // Blue
+  "#8B5CF6", // Purple
+  "#10B981", // Green
+  "#F59E0B", // Amber
+  "#EF4444", // Red
+];
+
 export default function Budgeting() {
+  const [summary, setSummary] = useState({});
   const [expenseBreakdown, setExpenseBreakdown] = useState([]);
+  const [revenueBreakdown, setRevenueBreakdown] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [aiInsights, setAiInsights] = useState([]);
   const [filterType, setFilterType] = useState("inflow");
   const [selectedMonth, setSelectedMonth] = useState("");
 
-  useEffect(() => {
-    // Simulated expense breakdown
-    setExpenseBreakdown([
-      { category: "Logistics", amount: 3000 },
-      { category: "Rent", amount: 10000 },
-      { category: "Salaries", amount: 15000 },
-      { category: "Utility Bills", amount: 2000 },
-      { category: "Personal", amount: 3000 },
-      { category: "Other", amount: 5000 },
-    ]);
-
-    // Simulated transaction history
-    setTransactions([
-      {
-        date: "2025-07-21",
-        time: "10:30 AM",
-        category: "Salary",
-        description: "July Salary Credited",
-        amount: 30000,
-        party: "HR Dept",
-        transactionType: "inflow",
-      },
-      {
-        date: "2025-07-22",
-        time: "03:45 PM",
-        category: "Rent",
-        description: "Office Rent Payment",
-        amount: 10000,
-        party: "Landlord",
-        transactionType: "outflow",
-      },
-      {
-        date: "2025-07-23",
-        time: "01:00 PM",
-        category: "Utility Bills",
-        description: "Electricity",
-        amount: 2500,
-        party: "MSEB",
-        transactionType: "outflow",
-      },
-      {
-        date: "2025-07-24",
-        time: "09:15 AM",
-        category: "Consulting",
-        description: "Payment from Client",
-        amount: 15000,
-        party: "Client A",
-        transactionType: "inflow",
-      },
-    ]);
-  }, []);
-
-  const purchaseData = [
-    { name: "Small Purchases", value: 1200 },
-    { name: "Medium Purchases", value: 4500 },
-    { name: "Online", value: 3000 },
-    { name: "Store", value: 6800 },
-    { name: "Seasonal", value: 2000 },
-  ];
-
-  const COLORS = [
-    "#3B82F6", // Blue
-    "#8B5CF6", // Purple
-    "#10B981", // Green
-    "#F59E0B", // Amber
-    "#EF4444", // Red
-  ];
-
-  // Generate month options (last 12 months)
   const monthOptions = useMemo(() => {
     return Array.from({ length: 12 }, (_, i) => {
       const date = new Date();
@@ -100,16 +42,64 @@ export default function Budgeting() {
     });
   }, []);
 
-  const totalRevenue = 50000;
-  const totalExpense = useMemo(() => {
-    return expenseBreakdown.reduce((sum, e) => sum + e.amount, 0);
-  }, [expenseBreakdown]);
-  const balance = totalRevenue - totalExpense;
+  useEffect(() => {
+    if (!selectedMonth) return;
 
-  // Filtered transactions by type
+    const lang = "english";
+    const user_id = "default_user";
+    const timeframe = selectedMonth;
+
+    const fetchData = async () => {
+      try {
+        const [
+          summaryRes,
+          expenseRes,
+          revenueRes,
+          transactionRes,
+          aiRes,
+        ] = await Promise.all([
+          fetch(
+            `/budget/summary?user_id=${user_id}&lang=${lang}&timeframe=${timeframe}`
+          ).then((res) => res.json()),
+          fetch(
+            `/budget/expense-by-category?user_id=${user_id}&lang=${lang}&timeframe=${timeframe}`
+          ).then((res) => res.json()),
+          fetch(
+            `/budget/revenue-by-category?user_id=${user_id}&lang=${lang}&timeframe=${timeframe}`
+          ).then((res) => res.json()),
+          fetch(
+            `/budget/transaction-history?user_id=${user_id}&lang=${lang}&timeframe=${timeframe}&page_size=100&page_number=1`
+          ).then((res) => res.json()),
+          fetch(
+            `/budget/budget-summary?user_id=${user_id}&lang=${lang}&timeframe=${timeframe}`
+          ).then((res) => res.json()),
+        ]);
+
+        setSummary(summaryRes);
+        setExpenseBreakdown(expenseRes);
+        setRevenueBreakdown(revenueRes);
+        setTransactions(transactionRes || []);
+        setAiInsights(aiRes?.insights || []);
+      } catch (error) {
+        console.error("Error fetching budgeting data:", error);
+      }
+    };
+
+    fetchData();
+  }, [selectedMonth]);
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => t.transactionType === filterType);
   }, [transactions, filterType]);
+
+  const purchaseData = expenseBreakdown.map((item) => ({
+    name: item.category,
+    value: item.amount,
+  }));
+
+  const totalRevenue = summary?.total_inflow || 0;
+  const totalExpense = summary?.total_outflow || 0;
+  const balance = totalRevenue - totalExpense;
 
   return (
     <div className="flex flex-col gap-6 w-full">
@@ -117,7 +107,7 @@ export default function Budgeting() {
         Budgeting
       </h1>
 
-      {/* Month Filter */}
+      {/* Month Selector */}
       <div className="flex justify-end">
         <select
           value={selectedMonth}
@@ -144,16 +134,16 @@ export default function Budgeting() {
           <h2 className="text-xl font-bold">₹{totalExpense.toFixed(2)}</h2>
         </div>
         <div className="bg-blue-100 dark:bg-blue-700 p-4 rounded text-blue-900 dark:text-blue-100">
-          <p className="font-medium">Profit/Loss</p>
+          <p className="font-medium">Profit / Loss</p>
           <h2 className="text-xl font-bold">₹{balance.toFixed(2)}</h2>
         </div>
       </div>
 
-      {/* Expense + Purchases */}
+      {/* Charts & Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-[40%_60%] gap-4">
         {/* Expense Breakdown */}
-        <div className="bg-white dark:bg-gray-800 p-3 rounded shadow">
-          <h2 className="text-lg font-medium text-gray-700 dark:text-gray-200 mb-4">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
             Expense Breakdown
           </h2>
           <ul className="space-y-3">
@@ -162,22 +152,9 @@ export default function Budgeting() {
                 key={idx}
                 className="flex items-center justify-between border-l-4 pl-4 py-2 rounded bg-gray-50 dark:bg-gray-900"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">
-                    {item.category === "Rent"
-                      ? "🏠"
-                      : item.category === "Logistics"
-                      ? "🚚"
-                      : item.category === "Salaries"
-                      ? "💼"
-                      : item.category === "Utility Bills"
-                      ? "💡"
-                      : "💸"}
-                  </span>
-                  <span className="text-gray-800 dark:text-gray-200 font-medium">
-                    {item.category}
-                  </span>
-                </div>
+                <span className="text-gray-800 dark:text-gray-200 font-medium">
+                  {item.category}
+                </span>
                 <span className="text-gray-700 dark:text-gray-300 font-semibold">
                   ₹{item.amount}
                 </span>
@@ -185,15 +162,15 @@ export default function Budgeting() {
             ))}
           </ul>
         </div>
-        {/* Purchase Details with Pie Chart */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mr-4">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b border-gray-200 dark:border-gray-700 pb-2">
+
+        {/* Purchase Pie Chart */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-6 border-b pb-2">
             🛍️ Purchase Breakdown
           </h2>
 
-          <div className="flex flex-col md:flex-row md:items-start items-center gap-6 w-full overflow-hidden">
-            {/* Pie Chart */}
-            <div className="w-full md:w-1/2 h-64 min-w-0">
+          <div className="flex flex-col md:flex-row items-center gap-6 w-full">
+            <div className="w-full md:w-1/2 h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -202,24 +179,17 @@ export default function Budgeting() {
                     nameKey="name"
                     outerRadius={90}
                     innerRadius={50}
-                    paddingAngle={3}
+                    paddingAngle={2}
                     label
                   >
                     {purchaseData.map((entry, index) => (
                       <Cell
-                        key={`cell-${index}`}
+                        key={index}
                         fill={COLORS[index % COLORS.length]}
                       />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#fff",
-                      borderRadius: "6px",
-                      fontSize: "0.875rem",
-                      padding: "8px",
-                    }}
-                  />
+                  <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -248,40 +218,28 @@ export default function Budgeting() {
         </div>
       </div>
 
-      {/* AI Suggestions */}
-      <div className="bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400 dark:border-yellow-600 p-6 rounded-xl shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-yellow-500 text-2xl">💡</span>
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+      {/* AI Insights */}
+      {aiInsights.length > 0 && (
+        <div className="bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400 dark:border-yellow-600 p-6 rounded-xl shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex gap-2 items-center">
+            <span className="text-yellow-500 text-2xl">💡</span>
             AI Suggestions
           </h2>
+          <ul className="space-y-3 text-gray-800 dark:text-gray-200 text-sm">
+            {aiInsights.map((insight, index) => (
+              <li key={index} className="flex gap-2 items-start">
+                <span className="mt-1 text-yellow-500">✔️</span>
+                <div>
+                  <strong>{insight.heading}</strong>
+                  <p>{insight.summary}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul className="space-y-3 text-gray-800 dark:text-gray-200 text-sm pl-1">
-          <li className="flex items-start gap-2">
-            <span className="text-yellow-400 mt-1">✔️</span>
-            <span>
-              Your utility bill is higher than average — consider checking
-              unnecessary consumption.
-            </span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-yellow-400 mt-1">✔️</span>
-            <span>
-              Online purchases have increased this month — try setting a monthly
-              cap.
-            </span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-yellow-400 mt-1">✔️</span>
-            <span>
-              Logistics cost seems significant — check for optimization or
-              vendor alternatives.
-            </span>
-          </li>
-        </ul>
-      </div>
+      )}
 
-      {/* Transaction Table */}
+      {/* Transactions Table */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded shadow mt-4 overflow-x-auto max-h-80 overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
@@ -324,7 +282,7 @@ export default function Budgeting() {
                 <th className="py-2 pr-4">Category</th>
                 <th className="py-2 pr-4">Description</th>
                 <th className="py-2 pr-4">Amount</th>
-                <th className="py-2 pr-4">Party Involved</th>
+                <th className="py-2 pr-4">Party</th>
               </tr>
             </thead>
             <tbody>

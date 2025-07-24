@@ -29,7 +29,7 @@ const ChatBotWidget = () => {
       },
       body: JSON.stringify({
         prompt: input,
-        user_id:"jayant",
+        user_id:"hariya-prasad",
       }),
     });
 
